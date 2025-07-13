@@ -15,7 +15,7 @@ products = [
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 TO_EMAIL = os.getenv("TO_EMAIL")
-INTERVAL = 300  # 每 5 分鐘檢查一次
+INTERVAL = 60  # 每1分鐘檢查一次
 
 def check_product(product):
     try:
