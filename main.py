@@ -4,18 +4,30 @@ import smtplib
 from email.mime.text import MIMEText
 import os
 import time
+import json
 
 products = [
-    {"name": "YOASOBI SSZS-52268（衣服）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52268?ima=0302", "has_size": True},
-    {"name": "YOASOBI SSZS-52265（衣服）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52265?ima=0326", "has_size": True},
-    {"name": "YOASOBI SSZS-52282（無尺寸）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52282?ima=0215", "has_size": False},
-    {"name": "YOASOBI SSZS-52280（無尺寸）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52280?ima=0506", "has_size": False},
+    {"id": "52268", "name": "YOASOBI SSZS-52268（衣服）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52268?ima=0302", "has_size": True},
+    {"id": "52265", "name": "YOASOBI SSZS-52265（衣服）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52265?ima=0326", "has_size": True},
+    {"id": "52282", "name": "YOASOBI SSZS-52282（無尺寸）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52282?ima=0215", "has_size": False},
+    {"id": "52280", "name": "YOASOBI SSZS-52280（無尺寸）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52280?ima=0506", "has_size": False},
 ]
 
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 TO_EMAIL = os.getenv("TO_EMAIL")
-INTERVAL = 60  # 每1分鐘檢查一次
+INTERVAL = 60  # 每 1 分鐘檢查一次
+STATUS_FILE = "last_status.json"
+
+def load_status():
+    if os.path.exists(STATUS_FILE):
+        with open(STATUS_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_status(status):
+    with open(STATUS_FILE, "w") as f:
+        json.dump(status, f)
 
 def check_product(product):
     try:
@@ -23,15 +35,13 @@ def check_product(product):
         soup = BeautifulSoup(resp.text, "html.parser")
         if product["has_size"]:
             sizes = [label.get_text(strip=True) for label in soup.select("label.size_btn") if "在庫なし" not in label.get_text()]
-            if sizes:
-                return f"🎽 {product['name']} 有貨！尺寸：{', '.join(sizes)}\n🔗 {product['url']}"
+            return bool(sizes)
         else:
             btn = soup.select_one("button.btn-curve.cart")
-            if btn and "在庫なし" not in btn.get_text():
-                return f"🎁 {product['name']} 有貨（無尺寸）\n🔗 {product['url']}"
+            return bool(btn and "在庫なし" not in btn.get_text())
     except Exception as e:
         print(f"⚠️ 檢查失敗：{product['url']}\n{e}")
-    return None
+    return False
 
 def send_email(subject, body):
     msg = MIMEText(body, "plain", "utf-8")
@@ -48,13 +58,30 @@ def send_email(subject, body):
 
 def main():
     print("🛒 YOASOBI 補貨監控中（Render 版本）")
+    last_status = load_status()
+
     while True:
-        messages = [check_product(p) for p in products if check_product(p)]
+        messages = []
+        new_status = {}
+
+        for p in products:
+            in_stock = check_product(p)
+            new_status[p["id"]] = in_stock
+
+            if in_stock and not last_status.get(p["id"], False):
+                # 狀態改變：由「無貨」變「有貨」
+                msg = f"🎉 {p['name']} 有貨啦！\n🔗 {p['url']}"
+                messages.append(msg)
+
         if messages:
             send_email("【YOASOBI 補貨通知】以下商品有貨啦！", "\n\n".join(messages))
         else:
             print(f"[{time.strftime('%H:%M:%S')}] 尚無補貨")
+
+        save_status(new_status)
+        last_status = new_status
         time.sleep(INTERVAL)
 
 if __name__ == "__main__":
     main()
+
