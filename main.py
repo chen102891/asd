@@ -16,7 +16,7 @@ products = [
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 TO_EMAIL = os.getenv("TO_EMAIL")
-INTERVAL = 60  # 每 1 分鐘檢查一次
+INTERVAL = 30  # 每 1 分鐘檢查一次
 STATUS_FILE = "last_status.json"
 
 def load_status():
@@ -38,7 +38,7 @@ def check_product(product):
             return bool(sizes)
         else:
             btn = soup.select_one("button.btn-curve.cart")
-            return bool(btn and "在庫なし" not in btn.get_text())
+            return bool(btn and "×在庫なし" not in btn.get_text())
     except Exception as e:
         print(f"⚠️ 檢查失敗：{product['url']}\n{e}")
     return False
