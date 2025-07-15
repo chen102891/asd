@@ -1,10 +1,10 @@
 services:
-  - type: worker
+  - type: web
     name: yoasobi-checker
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
+    startCommand: python main.pygit add render.yaml
     envVars:
       - key: EMAIL_ADDRESS
         value: appy19911029@gmail.com
