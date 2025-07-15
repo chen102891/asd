@@ -7,11 +7,11 @@ services:
     startCommand: python main.py
     envVars:
       - key: EMAIL_ADDRESS
-        sync: true
+        value: appy19911029@gmail.com
       - key: EMAIL_PASSWORD
-        sync: true
+        value: pqqv wuch ekdv cbjr
       - key: TO_EMAIL
-        sync: true
+        value: appy19911029@gmail.com
 
 
 
