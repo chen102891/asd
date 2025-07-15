@@ -1,18 +1,18 @@
 services:
-  - type: web
+  - type: worker
     name: yoasobi-checker
-    env: python
+    runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
-    autoDeploy: true
     envVars:
       - key: EMAIL_ADDRESS
-        value: appy19911029@gmail.com
+        sync: true
       - key: EMAIL_PASSWORD
-        value: pqqv wuch ekdv cbjr
+        sync: true
       - key: TO_EMAIL
-        value: appy19911029@gmail.com
+        sync: true
+
 
       
 
