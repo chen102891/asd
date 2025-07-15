@@ -1,8 +1,13 @@
 services:
   - type: worker
-    name: yoasobi-checker
-    env: python
-    plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python main.py"
-    autoDeploy: false
+    name: yoasobi-creaker
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: EMAIL_ADDRESS
+        sync: true
+      - key: EMAIL_PASSWORD
+        sync: true
+      - key: TO_EMAIL
+        sync: true
