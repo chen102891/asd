@@ -6,30 +6,27 @@ import os
 import time
 import json
 
-# 測試用單一商品
 products = [
     {"name": "YOASOBI SSZS-52268（衣服）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52268?ima=0302", "id": "SSZS-52268", "has_size": True},
+    {"name": "YOASOBI SSZS-52265（衣服）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52265?ima=0326", "id": "SSZS-52265", "has_size": True},
+    {"name": "YOASOBI SSZS-52282（無尺寸）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52282?ima=0215", "id": "SSZS-52282", "has_size": False},
+    {"name": "YOASOBI SSZS-52280（無尺寸）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52280?ima=0506", "id": "SSZS-52280", "has_size": False},
+    {"name": "YOASOBI SSZS-52277（毛巾）", "url": "https://yoasobi-onlinestore.com/s/n135ec/item/detail/SSZS-52277?ima=0122", "id": "SSZS-52277", "has_size": False},
 ]
 
 STATUS_FILE = "last_status.json"
-EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
-TO_EMAIL = os.getenv("TO_EMAIL")
 INTERVAL = 60  # 每 1 分鐘檢查一次
 
-# 讀取上次的庫存狀態
 def load_last_status():
     if os.path.exists(STATUS_FILE):
         with open(STATUS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {p["id"]: False for p in products}
 
-# 儲存最新的庫存狀態
 def save_status(status):
     with open(STATUS_FILE, "w", encoding="utf-8") as f:
         json.dump(status, f)
 
-# 檢查單一商品庫存
 def check_product(product):
     try:
         resp = requests.get(product["url"], headers={"User-Agent": "Mozilla/5.0"})
@@ -37,18 +34,16 @@ def check_product(product):
 
         if product["has_size"]:
             alerts = soup.select("div.alert_box p.alert")
+            found = False
             for alert in alerts:
-                l_text = alert.get_text(strip=True)
-                print(f"🔍 尺寸狀態：{l_text}")
-                if "L" in l_text:
-                    if "在庫なし" in l_text:
-                        print("❌ L 尺寸沒貨")
-                        return False
-                    else:
-                        print("✅ L 尺寸有貨")
-                        return True
-            print("❓ 找不到 L 尺寸標籤")
-            return False
+                text = alert.get_text(strip=True)
+                print(f"🔍 尺寸狀態：{text}")
+                if any(size in text for size in ["M", "L"]) and "在庫なし" not in text:
+                    print(f"✅ 尺寸有貨！➡ {text}")
+                    found = True
+            if not found:
+                print("❌ M / L 都沒貨")
+            return found
         else:
             btn = soup.select_one("button.btn-curve.cart")
             return btn and "在庫なし" not in btn.get_text()
@@ -57,22 +52,14 @@ def check_product(product):
         print(f"⚠️ 檢查失敗：{product['url']}\n{e}")
         return False
 
-# 寄送 Email
+# 暫時停用寄信功能
 def send_email(subject, body):
-    msg = MIMEText(body, "plain", "utf-8")
-    msg["Subject"] = subject
-    msg["From"] = EMAIL_ADDRESS
-    msg["To"] = TO_EMAIL
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-            server.send_message(msg)
-        print("✅ Email 已發送")
-    except Exception as e:
-        print("⚠️ Email 發送失敗：", e)
+    print("📧（暫不寄信）通知內容如下：")
+    print(subject)
+    print(body)
 
 def main():
-    print("🛒 YOASOBI 補貨監控中（L 尺寸專用）")
+    print("🛒 YOASOBI 補貨監控中（M / L 尺寸 + 無尺寸商品）")
     last_status = load_last_status()
 
     while True:
@@ -83,11 +70,13 @@ def main():
             in_stock = check_product(p)
             new_status[p["id"]] = in_stock
             if in_stock and not last_status.get(p["id"], False):
-                msg = f"🛍️ {p['name']} L 尺寸有貨！\n🔗 {p['url']}"
+                msg = f"🛍️ {p['name']} 有貨！\n🔗 {p['url']}"
                 messages.append(msg)
 
         if messages:
-            send_email("【YOASOBI 補貨通知】L 尺寸有貨啦！", "\n\n".join(messages))
+            # send_email("【YOASOBI 補貨通知】以下商品有貨啦！", "\n\n".join(messages))
+            print("✅ 補貨通知（模擬）:")
+            print("\n\n".join(messages))
         else:
             print(f"[{time.strftime('%H:%M:%S')}] 尚無補貨")
 
@@ -97,3 +86,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
