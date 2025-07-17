@@ -18,28 +18,30 @@ STATUS_FILE = "last_status.json"
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 TO_EMAIL = os.getenv("TO_EMAIL")
-INTERVAL = 30  # 每 30秒檢查一次
+INTERVAL = 60  # 每 1 分鐘檢查一次
 
-# 讀取上次的庫存狀態
 def load_last_status():
     if os.path.exists(STATUS_FILE):
         with open(STATUS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {p["id"]: False for p in products}
 
-# 儲存最新的庫存狀態
 def save_status(status):
     with open(STATUS_FILE, "w", encoding="utf-8") as f:
         json.dump(status, f)
 
-# 檢查單一商品
 def check_product(product):
     try:
         resp = requests.get(product["url"], headers={"User-Agent": "Mozilla/5.0"})
         soup = BeautifulSoup(resp.text, "html.parser")
+
         if product["has_size"]:
-            sizes = [label.get_text(strip=True) for label in soup.select("label.size_btn") if "在庫なし" not in label.get_text()]
-            return bool(sizes)
+            labels = soup.select("label.size_btn")
+            l_label = next((label for label in labels if "L" in label.get_text()), None)
+            if l_label:
+                l_text = l_label.get_text(strip=True)
+                return not any(term in l_text for term in ["在庫なし", "販売しておりません"])
+            return False  # 沒找到 L，就當作沒貨
         else:
             btn = soup.select_one("button.btn-curve.cart")
             return btn and "在庫なし" not in btn.get_text()
@@ -47,7 +49,6 @@ def check_product(product):
         print(f"⚠️ 檢查失敗：{product['url']}\n{e}")
         return False
 
-# 寄信
 def send_email(subject, body):
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
@@ -73,7 +74,7 @@ def main():
             in_stock = check_product(p)
             new_status[p["id"]] = in_stock
             if in_stock and not last_status.get(p["id"], False):
-                msg = f"🛍️ {p['name']} 有貨！\n🔗 {p['url']}"
+                msg = f"🛍️ {p['name']} 有貨啦！（L 尺寸）\n🔗 {p['url']}"
                 messages.append(msg)
 
         if messages:
