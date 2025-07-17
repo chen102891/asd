@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+import os
 import time
 import json
 
@@ -25,41 +26,44 @@ def save_status(status):
         json.dump(status, f)
 
 def check_product(product):
+    print(f"\n🔎 檢查商品： {product['name']}")
     try:
         resp = requests.get(product["url"], headers={"User-Agent": "Mozilla/5.0"})
         soup = BeautifulSoup(resp.text, "html.parser")
 
         if product["has_size"]:
-            status_list = soup.select("div.alert_box p.alert")
-            found_m = found_l = False
-
-            for tag in status_list:
-                text = tag.get_text(strip=True)
+            labels = soup.select("label.size_btn")
+            size_statuses = []
+            for label in labels:
+                text = label.get_text(strip=True)
+                size_statuses.append(text)
                 print(f"🔍 尺寸狀態：{text}")
-                if "M" in text and "在庫なし" not in text:
-                    found_m = True
-                if "L" in text and "在庫なし" not in text:
-                    found_l = True
 
-            if found_m or found_l:
-                if found_m and found_l:
-                    print("✅ M / L 尺寸有貨！")
-                elif found_m:
-                    print("✅ M 尺寸有貨！")
-                elif found_l:
-                    print("✅ L 尺寸有貨！")
+            has_m = any("M" in t and "在庫なし" not in t for t in size_statuses)
+            has_l = any("L" in t and "在庫なし" not in t for t in size_statuses)
+
+            if has_m or has_l:
+                if has_m: print("✅ M 尺寸有貨！")
+                if has_l: print("✅ L 尺寸有貨！")
                 return True
             else:
                 print("❌ M / L 都沒貨")
                 return False
+
         else:
+            alert_box = soup.select_one("div.alert_box")
+            if alert_box and "在庫なし" in alert_box.get_text():
+                print("❌ 無尺寸商品沒貨（頁面寫明在庫なし）")
+                return False
+
             btn = soup.select_one("button.btn-curve.cart")
             if btn and "在庫なし" not in btn.get_text():
                 print("✅ 無尺寸商品有貨！")
                 return True
             else:
-                print("❌ 無尺寸商品沒貨")
+                print("❌ 無尺寸商品沒貨（按鈕判斷）")
                 return False
+
     except Exception as e:
         print(f"⚠️ 檢查失敗：{product['url']}\n{e}")
         return False
@@ -71,32 +75,33 @@ def main():
     while True:
         new_status = {}
         messages = []
+        not_found = []
 
         for p in products:
-            print("\n🔎 檢查商品：", p["name"])
             in_stock = check_product(p)
             new_status[p["id"]] = in_stock
+
             if in_stock and not last_status.get(p["id"], False):
-                msg = f"🛍️ {p['name']} 有貨！\n🔗 {p['url']}"
+                msg = f"\n🛍️ {p['name']} 有貨！\n🔗 {p['url']}\n"
                 messages.append(msg)
+            if not in_stock:
+                not_found.append(f"🔸 {p['name']} 尚無補貨")
 
+        # 模擬寄信：只印出訊息
         if messages:
-            print("\n✅ 補貨通知（模擬）:\n")
-            print("\n\n".join(messages))
-        else:
-            print(f"\n[{time.strftime('%H:%M:%S')}] 尚無補貨")
+            print("\n✅ 補貨通知（模擬）:")
+            for m in messages:
+                print(m)
 
-        # 顯示未補貨商品
-        unavailable = [p["name"] for p in products if not new_status.get(p["id"], False)]
-        if unavailable:
-            print("\n❌ 尚未補貨的商品：")
-            for name in unavailable:
-                print(f"- {name}")
+        if not_found:
+            print("\n📭 尚未補貨商品：")
+            for item in not_found:
+                print(item)
 
+        print(f"\n[{time.strftime('%H:%M:%S')}] 尚無補貨")
         save_status(new_status)
         last_status = new_status
         time.sleep(INTERVAL)
 
 if __name__ == "__main__":
-    import os
     main()
