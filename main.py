@@ -42,13 +42,9 @@ def check_product(product):
             has_m = any("M" in t and "在庫なし" not in t for t in size_statuses)
             has_l = any("L" in t and "在庫なし" not in t for t in size_statuses)
 
-            if has_m or has_l:
-                if has_m: print("✅ M 尺寸有貨！")
-                if has_l: print("✅ L 尺寸有貨！")
-                return True
-            else:
-                print("❌ M / L 都沒貨")
-                return False
+            if has_m: print("✅ M 尺寸有貨！")
+            if has_l: print("✅ L 尺寸有貨！")
+            return has_m or has_l
 
         else:
             alert_box = soup.select_one("div.alert_box")
@@ -82,19 +78,18 @@ def main():
             new_status[p["id"]] = in_stock
 
             if in_stock and not last_status.get(p["id"], False):
-                msg = f"\n🛍️ {p['name']} 有貨！\n🔗 {p['url']}\n"
+                msg = f"\n🏍️ {p['name']} 有貨！\n🔗 {p['url']}\n"
                 messages.append(msg)
             if not in_stock:
                 not_found.append(f"🔸 {p['name']} 尚無補貨")
 
-        # 模擬寄信：只印出訊息
         if messages:
             print("\n✅ 補貨通知（模擬）:")
             for m in messages:
                 print(m)
 
         if not_found:
-            print("\n📭 尚未補貨商品：")
+            print("\n📬 尚未補貨商品：")
             for item in not_found:
                 print(item)
 
