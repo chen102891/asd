@@ -17,7 +17,7 @@ STATUS_FILE = "last_status.json"
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 TO_EMAIL = os.getenv("TO_EMAIL")
-INTERVAL = 60  # 每 1 分鐘檢查一次
+INTERVAL = 30  # 每 30秒檢查一次
 
 # 讀取上次的庫存狀態
 def load_last_status():
