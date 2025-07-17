@@ -19,63 +19,62 @@ STATUS_FILE = "last_status.json"
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 TO_EMAIL = os.getenv("TO_EMAIL")
-INTERVAL = 60  # 每 1 分鐘檢查一次
+INTERVAL = 60
 
-# 讀取上次的庫存狀態
+
 def load_last_status():
     if os.path.exists(STATUS_FILE):
         with open(STATUS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {p["id"]: False for p in products}
 
-# 儲存最新的庫存狀態
+
 def save_status(status):
     with open(STATUS_FILE, "w", encoding="utf-8") as f:
         json.dump(status, f)
 
-# 檢查單一商品
+
 def check_product(product):
-    print(f"\n🔎 檢查商品： {product['name']}")
     try:
+        print(f"\n🔎 檢查商品： {product['name']}")
         resp = requests.get(product["url"], headers={"User-Agent": "Mozilla/5.0"})
         soup = BeautifulSoup(resp.text, "html.parser")
 
         if product["has_size"]:
-            found_sizes = []
-            available = []
-            for p_tag in soup.select("div.alert_box p.alert"):
-                text = p_tag.get_text(strip=True)
-                match = re.match(r"([SML])\s*\((.+)\)", text)
-                if match:
-                    size = match.group(1)
-                    status = match.group(2)
-                    print(f"🔍 尺寸狀態：{size}（{status}）")
-                    found_sizes.append(size)
-                    if size in ["M", "L"] and "在庫なし" not in status:
-                        available.append(size)
+            size_alerts = soup.select("div.alert_box p.alert")
+            size_found = {"M": False, "L": False}
+            for p in size_alerts:
+                text = p.get_text(strip=True)
+                print(f"🔍 尺寸狀態：{text}")
+                m = re.match(r"([SML])\s*\((.+)\)", text)
+                if m:
+                    size = m.group(1)
+                    status = m.group(2)
+                    if size in size_found and "在庫なし" not in status:
+                        size_found[size] = True
 
-            if available:
-                for size in available:
-                    print(f"✅ {size} 尺寸有貨！")
-                return True
-            else:
+            if size_found["M"]:
+                print("✅ M 尺寸有貨！")
+            if size_found["L"]:
+                print("✅ L 尺寸有貨！")
+            if not size_found["M"] and not size_found["L"]:
                 print("❌ M / L 都沒貨")
-                return False
+
+            return size_found["M"] or size_found["L"]
 
         else:
-            alert_box = soup.select_one("div.alert_box p.alert")
-            if alert_box and "在庫なし" in alert_box.get_text():
+            alert_texts = [p.get_text(strip=True) for p in soup.select("div.alert_box p.alert")]
+            if any("在庫なし" in t for t in alert_texts):
                 print("❌ 無尺寸商品沒貨（頁面寫明在庫なし）")
                 return False
-            else:
-                print("✅ 無尺寸商品有貨！")
-                return True
+            print("✅ 無尺寸商品有貨！")
+            return True
 
     except Exception as e:
         print(f"⚠️ 檢查失敗：{product['url']}\n{e}")
         return False
 
-# 寄信
+
 def send_email(subject, body):
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
@@ -85,9 +84,10 @@ def send_email(subject, body):
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             server.send_message(msg)
-        print("✅ Email 已發送")
+        print("📧 Email 已發送")
     except Exception as e:
         print("⚠️ Email 發送失敗：", e)
+
 
 def main():
     print("\n🛒 YOASOBI 補貨監控中（M / L 尺寸 + 無尺寸商品）")
@@ -102,26 +102,27 @@ def main():
             in_stock = check_product(p)
             new_status[p["id"]] = in_stock
             if in_stock and not last_status.get(p["id"], False):
-                msg = f"\n🛍️ {p['name']} 有貨！\n🔗 {p['url']}"
-                messages.append(msg)
-            elif not in_stock:
-                unstocked.append(f"🔸 {p['name']} 尚無補貨")
+                messages.append(f"🛍️ {p['name']} 有貨！\n🔗 {p['url']}")
+            if not in_stock:
+                unstocked.append(p["name"])
 
         if messages:
-            print("\n✅ 補貨通知（模擬）:")
-            print("\n".join(messages))
+            print("\n✅ 補貨通知：\n")
+            for m in messages:
+                print(m + "\n")
+            send_email("【YOASOBI 補貨通知】以下商品有貨啦！", "\n\n".join(messages))
         else:
-            print(f"\n[{time.strftime('%H:%M:%S')}] 尚無補貨")
+            print(f"[{time.strftime('%H:%M:%S')}] 尚無補貨")
 
         if unstocked:
             print("\n📭 尚未補貨商品：")
-            for u in unstocked:
-                print(u)
+            for name in unstocked:
+                print(f"🔸 {name} 尚無補貨")
 
         save_status(new_status)
         last_status = new_status
         time.sleep(INTERVAL)
 
+
 if __name__ == "__main__":
     main()
-
